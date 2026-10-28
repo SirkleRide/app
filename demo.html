@@ -1,0 +1,53 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Sirkle – Live demo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0}body{font-family:Montserrat,system-ui,sans-serif;background:#0b0b0b;color:#fff;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:env(safe-area-inset-top,0px) 12px env(safe-area-inset-bottom,0px)}
+h1{font-size:15px;letter-spacing:.16em;padding:14px 0 4px}#cap{min-height:3.4em;max-width:680px;text-align:center;font-size:clamp(15px,2.3vw,19px);font-weight:600;line-height:1.35;padding:6px 8px}
+.stage{display:flex;gap:clamp(10px,3vw,36px);justify-content:center;width:100%}.col{display:flex;flex-direction:column;align-items:center;gap:8px}.lab{font-size:12px;letter-spacing:.18em;color:#9a9a9a;font-weight:600}
+iframe{width:min(44vw,370px);height:min(72vh,700px);border:6px solid #222;border-radius:28px;background:#fff}
+button{margin:14px 0;background:#fff;color:#000;border:0;border-radius:22px;padding:11px 22px;font:600 14px Montserrat,sans-serif;cursor:pointer}button:disabled{opacity:.4;cursor:wait}button:focus-visible{outline:3px solid #888}
+.ctl{display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:center}.vl{font-size:12px;color:#ccc;display:flex;gap:6px;align-items:center}.vl select{max-width:210px;background:#1a1a1a;color:#fff;border:1px solid #444;border-radius:8px;padding:6px}
+.note{color:#9a9a9a;font-size:12px;max-width:560px;text-align:center}
+</style></head><body>
+<h1>SIRKLE · LIVE DEMO</h1><div id="cap" aria-live="polite"></div>
+<div class="stage"><div class="col"><span class="lab">PASSENGER</span><iframe id="rf" title="Passenger app"></iframe></div><div class="col"><span class="lab">DRIVER</span><iframe id="df" title="Driver app"></iframe></div></div>
+<div class="ctl"><button id="go">▶ Start demo with voiceover</button><label class="vl"><input type="checkbox" id="mu"> Mute</label><label class="vl">Voice <select id="vs" aria-label="Narrator voice"></select></label></div><p class="note">These are the real Sirkle apps running live against your server. A demo passenger and demo driver are created automatically.</p>
+<script>
+const PW="DemoPass123",AIR=["George Airport",-34.0056,22.3789],$=id=>document.getElementById(id),cap=t=>$("cap").textContent=t;
+const sleep=ms=>new Promise(r=>setTimeout(r,ms/(window.SPEED||1)));let running=false,RT,DT,rw,dw;
+async function api(p,m,b,t){const r=await fetch("/api"+p,{method:m||"GET",headers:{"Content-Type":"application/json",...(t?{Authorization:"Bearer "+t}:{})},body:b?JSON.stringify(b):undefined});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||r.status);return j}
+async function acct(email,name,role,x){try{return(await api("/register","POST",{name,email,password:PW,role,...x})).token}catch(e){return(await api("/login","POST",{email,password:PW})).token}}
+function along(p,f){const L=[0];for(let i=1;i<p.length;i++)L.push(L[i-1]+Math.hypot(p[i][0]-p[i-1][0],p[i][1]-p[i-1][1]));const x=f*L[L.length-1];let i=1;while(i<p.length-1&&L[i]<x)i++;const u=(x-L[i-1])/((L[i]-L[i-1])||1);return[p[i-1][0]+(p[i][0]-p[i-1][0])*u,p[i-1][1]+(p[i][1]-p[i-1][1])*u]}
+async function drive(pts,n){for(let k=0;k<=n;k++){const p=along(pts,k/n);if(dw._gp)dw._gp({coords:{latitude:p[0],longitude:p[1]}});await api("/driver/loc","POST",{lat:p[0],lon:p[1]},DT).catch(()=>{});await sleep(1000)}}
+let V=[];const vs=$("vs"),SYN=window.speechSynthesis;
+function loadV(){if(!SYN)return;const pf=v=>(/ZA/i.test(v.lang)?0:/Natural|Online/i.test(v.name)?1:2)+(/female|aria|jenny|leah|zira|samantha|sonia|libby|hazel|susan|karen|moira|ava|emma|michelle|jane/i.test(v.name)?0:5);
+V=SYN.getVoices().filter(v=>/^en/i.test(v.lang)).sort((x,y)=>pf(x)-pf(y));vs.innerHTML=V.map((v,i)=>`<option value="${i}">${v.name} (${v.lang})</option>`).join("")||"<option>Default voice</option>"}
+if(SYN){loadV();SYN.onvoiceschanged=loadV}
+function say(t){return new Promise(res=>{if($("mu").checked||!SYN||!V.length)return sleep(t.split(" ").length*330).then(res);
+const u=new SpeechSynthesisUtterance(t),v=V[+vs.value];if(v){u.voice=v;u.lang=v.lang}u.rate=1.1;u.pitch=1.2;let d=0;const f=()=>{if(!d){d=1;res()}};u.onend=f;u.onerror=f;SYN.speak(u);setTimeout(f,t.length*120+2500)})}
+vs.onchange=()=>{SYN&&SYN.cancel();say("Welcome to Sirkle! Life’s better in a Sirkle!")};
+async function step(t,min,fn){cap(t);const sp=say(t);if(fn)await fn();await Promise.all([sp,sleep(min)])}
+async function run(){if(running)return;running=true;$("go").disabled=true;if(SYN)SYN.cancel();let id,pk,route;
+try{
+ await step("Welcome to Sirkle! Life’s better in a Sirkle! Let’s take a ride around George!",0,async()=>{
+  RT=await acct("demo.rider@sirkle.demo","Thandi Rider","rider");DT=await acct("demo.driver@sirkle.demo","Sipho Mokoena","driver",{vehicle:"Toyota Corolla",plate:"CA 482 913"});
+  localStorage.setItem("sk_tok",RT);localStorage.setItem("sk_dtok",DT);
+  $("rf").src="/?demo=1&t="+Date.now();$("df").src="/driver?demo=1&t="+Date.now();await sleep(5500);rw=$("rf").contentWindow;dw=$("df").contentWindow});
+ await step("First up, our driver goes online, and they’re ready to roll!",2000,async()=>{if(!(dw.S.st&&dw.S.st.online))await dw.tog()});
+ await step("Our passenger picks George Airport. Quick and easy!",1500,async()=>{rw.S.drop=[...AIR];rw.S.q="";rw.draw()});
+ await step("Look at those upfront fares! Cheaper than other passenger apps, on a real driving route!",5000,async()=>{await rw.toOpts()});
+ await step("Tap confirm, and boom! The request lands on the driver’s phone instantly!",4000,async()=>{await rw.book()});
+ id=(await api("/rides/active",0,0,RT)).ride.id;
+ await step("The driver accepts, and the passenger sees who’s coming, the car, and the plate number!",3500,async()=>{await dw.acc(id)});
+ pk=[rw.S.pick[1],rw.S.pick[2]];route=rw.S.route&&rw.S.route.length>1?rw.S.route:[pk,[AIR[1],AIR[2]]];
+ await step("Watch the car glide to the pickup, live on the map!",0,async()=>{await drive([[pk[0]+.012,pk[1]-.01],pk],9)});
+ await step("The driver has arrived! Time to go!",2500,async()=>{await dw.adv(id,"arrived")});
+ await step("And we’re off! A live trip across George, all the way to the airport!",0,async()=>{await dw.adv(id,"ontrip");await drive(route,26)});
+ await step("Trip complete! And the best part? Drivers keep ninety percent of every fare!",3500,async()=>{await dw.adv(id,"completed")});
+ await step("Five stars! The passenger rates the trip, and the driver’s earnings update instantly!",3000,async()=>{rw.S.rate=5;rw.draw();await sleep(2500);await rw.reset()});
+ await step("Sirkle! Lower fares for riders, more money for drivers. Life’s better in a Sirkle!",1500)
+}catch(e){cap("The demo couldn’t run: "+e.message+". Make sure node server.js is running and you opened this page from it (http://localhost:3000/demo).")}
+running=false;$("go").disabled=false;$("go").textContent="↻ Replay demo"}
+$("go").onclick=run;cap("Press Start to begin. Turn your sound on!");
+</script></body></html>
